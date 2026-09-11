@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/favicon.svg"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Hydra Exporter</title>
+  </head>
+
+  <body>
+    <aside id="sidebar">
+      <h2>Hydra Exporter</h2>
+
+      <div class="section">
+        <label for="hydraCode">
+          Hydra Patch Code
+        </label>
+
+        <textarea
+          id="hydraCode"
+          spellcheck="false"
+        >
+      </textarea>
+      </div>
+
+      <div class="section">
+        <label>
+          Target Resolution
+        </label>
+
+        <div class="input-group">
+          <input
+            type="number"
+            id="resWidth"
+            value="3840"
+            min="1"
+            placeholder="Width"
+          />
+
+          <input
+            type="number"
+            id="resHeight"
+            value="2160"
+            min="1"
+            placeholder="Height"
+          />
+        </div>
+
+        <div class="resolution-presets">
+          <button
+            data-width="1920"
+            data-height="1080"
+          >
+            1080p
+          </button>
+
+          <button
+            data-width="3840"
+            data-height="2160"
+          >
+            4K
+          </button>
+
+          <button
+            data-width="5120"
+            data-height="2880"
+          >
+            5K
+          </button>
+
+          <button
+            data-width="7680"
+            data-height="4320"
+          >
+            8K
+          </button>
+
+          <button
+            data-width="10240"
+            data-height="5760"
+          >
+            10K
+          </button>
+
+          <button
+            data-width="10000"
+            data-height="5625"
+          >
+            10K Exact
+          </button>
+        </div>
+      </div>
+
+      <div class="section">
+        <label>
+          Animation Export
+        </label>
+
+        <div class="input-group">
+          <input
+            type="number"
+            id="frameCount"
+            value="60"
+            min="1"
+            max="10000"
+            placeholder="Frames"
+          />
+
+          <input
+            type="number"
+            id="fps"
+            value="60"
+            min="1"
+            max="240"
+            step="1"
+            placeholder="FPS"
+          />
+        </div>
+
+        <div class="input-group">
+          <input
+            type="number"
+            id="seed"
+            value="12345"
+            placeholder="Seed"
+          />
+        </div>
+
+        <button id="exportFramesBtn">
+          Export Frames as ZIP
+        </button>
+      </div>
+
+      <button id="renderBtn">
+        Render Preview
+      </button>
+
+      <button id="exportBtn">
+        Export High-Res PNG
+      </button>
+
+      <div class="section">
+        <div class="section-header">
+          <label for="glslOutput">
+            Generated Fragment GLSL
+          </label>
+
+          <button id="copyGlslBtn">
+            Copy GLSL
+          </button>
+        </div>
+
+        <textarea
+          id="glslOutput"
+          readonly
+          spellcheck="false"
+          placeholder="Generated GLSL will appear here..."
+        ></textarea>
+      </div>
+    </aside>
+
+    <main id="preview-container">
+      <canvas id="hydraCanvas"></canvas>
+
+      <div id="status">
+        Initializing Hydra...
+      </div>
+    </main>
+
+    <script
+      type="module"
+      src="/src/main.ts"
+    ></script>
+  </body>
+</html>

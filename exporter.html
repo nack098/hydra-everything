@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Hydra Standalone Texture Exporter</title>
+
+  <script src="https://unpkg.com/hydra-synth"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+
+      display: flex;
+
+      background: #121212;
+      color: #eee;
+
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    #sidebar {
+      width: 420px;
+      min-width: 420px;
+
+      padding: 20px;
+
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+
+      background: #1e1e1e;
+
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    h2 {
+      margin: 0;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    textarea {
+      width: 100%;
+
+      padding: 10px;
+
+      background: #2a2a2a;
+      color: #72f1b8;
+
+      border: 1px solid #444;
+      border-radius: 6px;
+
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.4;
+
+      resize: vertical;
+      outline: none;
+    }
+
+    #hydraCode {
+      height: 280px;
+    }
+
+    #glslOutput {
+      height: 320px;
+
+      color: #f8f8f2;
+      background: #181818;
+
+      white-space: pre;
+      overflow: auto;
+    }
+
+    textarea:focus,
+    input:focus {
+      border-color: #6200ee;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    input {
+      width: 50%;
+
+      padding: 8px;
+
+      background: #2a2a2a;
+      color: #fff;
+
+      border: 1px solid #444;
+      border-radius: 4px;
+
+      outline: none;
+    }
+
+    button {
+      width: 100%;
+
+      padding: 12px;
+
+      background: #6200ee;
+      color: #fff;
+
+      border: none;
+      border-radius: 6px;
+
+      cursor: pointer;
+
+      font-weight: bold;
+
+      transition:
+        background 0.2s,
+        opacity 0.2s;
+    }
+
+    button:hover {
+      background: #3700b3;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+
+    #exportBtn {
+      background: #03dac6;
+      color: #000;
+    }
+
+    #exportBtn:hover {
+      background: #00bfa5;
+    }
+
+    .resolution-presets {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .resolution-presets button {
+      padding: 8px;
+      background: #333;
+      font-size: 11px;
+    }
+
+    .resolution-presets button:hover {
+      background: #444;
+    }
+
+    #preview-container {
+      flex: 1;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      position: relative;
+
+      background: #000;
+
+      overflow: hidden;
+    }
+
+    #hydraCanvas {
+      width: auto;
+      height: auto;
+
+      max-width: 90%;
+      max-height: 90%;
+
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+
+    #status {
+      position: absolute;
+
+      left: 15px;
+      bottom: 15px;
+
+      padding: 6px 10px;
+
+      background: rgba(0, 0, 0, 0.65);
+
+      border-radius: 4px;
+
+      color: #aaa;
+
+      font-family: monospace;
+      font-size: 12px;
+
+      pointer-events: none;
+    }
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #copyGlslBtn {
+      width: auto;
+      padding: 5px 9px;
+
+      background: #333;
+
+      font-size: 11px;
+    }
+
+    #copyGlslBtn:hover {
+      background: #444;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <aside id="sidebar">
+
+<h2>Hydra Exporter</h2>
+
+<div class="section">
+
+  <label for="hydraCode">
+    Hydra Patch Code
+  </label>
+
+  <textarea
+    id="hydraCode"
+    spellcheck="false"
+  >
+await loadScript("https://cdn.jsdelivr.net/gh/geikha/hyper-hydra@latest/hydra-fractals.js")
+
+await loadScript("https://cdn.jsdelivr.net/gh/geikha/hyper-hydra@latest/hydra-outputs.js")
+
+oS.setLinear()
+
+src(o0)
+.scale(.75)
+.add(noise(2, 1), .4)
+.invert()
+.inversion()
+.mirrorX2()
+.blend(o0, .3)
+.out(o0)
+  </textarea>
+</div>
+
+
+<div class="section">
+
+  <label>
+    Target Resolution
+  </label>
+
+  <div class="input-group">
+
+    <input
+      type="number"
+      id="resWidth"
+      value="3840"
+      min="1"
+      placeholder="Width"
+    >
+
+    <input
+      type="number"
+      id="resHeight"
+      value="2160"
+      min="1"
+      placeholder="Height"
+    >
+
+  </div>
+
+  <div class="resolution-presets">
+
+    <button data-width="1920" data-height="1080">
+      1080p
+    </button>
+
+    <button data-width="3840" data-height="2160">
+      4K
+    </button>
+
+    <button data-width="5120" data-height="2880">
+      5K
+    </button>
+
+    <button data-width="7680" data-height="4320">
+      8K
+    </button>
+
+    <button data-width="10240" data-height="5760">
+      10K
+    </button>
+
+    <button data-width="10000" data-height="5625">
+      10K Exact
+    </button>
+
+  </div>
+
+</div>
+
+
+<button id="renderBtn">
+  Render Preview
+</button>
+
+<button id="exportBtn">
+  Export High-Res PNG
+</button>
+
+
+<div class="section">
+
+  <div class="section-header">
+
+    <label for="glslOutput">
+      Generated Fragment GLSL
+    </label>
+
+    <button id="copyGlslBtn">
+      Copy GLSL
+    </button>
+
+  </div>
+
+  <textarea
+    id="glslOutput"
+    readonly
+    spellcheck="false"
+    placeholder="Generated GLSL will appear here..."
+  ></textarea>
+
+</div>
+  </aside>
+  <main id="preview-container">
+<canvas id="hydraCanvas"></canvas>
+<div id="status">
+  Initializing Hydra...
+</div>
+  </main>
+
+  <script>
+
+    /*
+     * ============================================================
+     * DOM
+     * ============================================================
+     */
+
+    const canvas =
+      document.getElementById("hydraCanvas");
+
+    const codeEditor =
+      document.getElementById("hydraCode");
+
+    const widthInput =
+      document.getElementById("resWidth");
+
+    const heightInput =
+      document.getElementById("resHeight");
+
+    const renderButton =
+      document.getElementById("renderBtn");
+
+    const exportButton =
+      document.getElementById("exportBtn");
+
+    const copyGlslButton =
+      document.getElementById("copyGlslBtn");
+
+    const glslOutput =
+      document.getElementById("glslOutput");
+
+    const status =
+      document.getElementById("status");
+
+
+    /*
+     * ============================================================
+     * SETTINGS
+     * ============================================================
+     */
+
+    const SETTINGS = {
+
+      previewWidth: 1920,
+      previewHeight: 1080,
+
+      maxWidth: 16384,
+      maxHeight: 16384,
+
+      renderWaitFrames: 5,
+      exportWaitFrames: 8
+
+    };
+
+
+    /*
+     * ============================================================
+     * GLSL CAPTURE
+     *
+     * Hydra uses WebGL internally.
+     *
+     * We intercept gl.shaderSource() so we can see the actual
+     * fragment shader source Hydra sends to WebGL.
+     * ============================================================
+     */
+
+    function installGLSLLogger(canvas) {
+
+      const originalGetContext =
+        canvas.getContext.bind(canvas);
+
+
+      canvas.getContext =
+        function (type, attributes) {
+
+          const gl =
+            originalGetContext(type, attributes);
+
+
+          if (
+            !gl ||
+            !(
+              type === "webgl" ||
+              type === "webgl2" ||
+              type === "experimental-webgl"
+            )
+          ) {
+            return gl;
+          }
+
+          if (gl.__hydraGLSLLoggerInstalled) {
+            return gl;
+          }
+
+          gl.__hydraGLSLLoggerInstalled = true;
+
+
+          const originalShaderSource =
+            gl.shaderSource.bind(gl);
+
+
+          gl.shaderSource =
+            function (shader, source) {
+
+              try {
+
+                const shaderType =
+                  gl.getShaderParameter(
+                    shader,
+                    gl.SHADER_TYPE
+                  );
+
+
+                /*
+                 * We only care about fragment shaders.
+                 */
+
+                if (
+                  shaderType === gl.FRAGMENT_SHADER
+                ) {
+
+                  /*
+                   * Save globally.
+                   */
+
+                  window.lastHydraFragmentShader =
+                    source;
+
+
+                  /*
+                   * Put it into the UI.
+                   */
+
+                  glslOutput.value =
+                    source;
+
+
+                  /*
+                   * Also print it to DevTools.
+                   */
+
+                  console.groupCollapsed(
+                    "%cHydra Fragment Shader",
+                    "color:#72f1b8;font-weight:bold"
+                  );
+
+                  console.log(source);
+
+                  console.groupEnd();
+
+                }
+
+              } catch (error) {
+
+                console.warn(
+                  "Failed to capture GLSL:",
+                  error
+                );
+
+              }
+
+
+              return originalShaderSource(
+                shader,
+                source
+              );
+
+            };
+
+
+          return gl;
+
+        };
+
+    }
+
+
+    /*
+     * IMPORTANT:
+     *
+     * This MUST happen before Hydra creates its WebGL context.
+     */
+
+    installGLSLLogger(canvas);
+
+
+    /*
+     * ============================================================
+     * HYDRA
+     * ============================================================
+     */
+
+    const hydra =
+      new Hydra({
+
+        canvas: canvas,
+
+        width:
+          SETTINGS.previewWidth,
+
+        height:
+          SETTINGS.previewHeight,
+
+        makeGlobal: true,
+
+        autoLoop: true,
+
+        detectAudio: true
+
+      });
+
+
+    window.hydra = hydra;
+
+
+    /*
+     * ============================================================
+     * OUTPUT SETTINGS
+     * ============================================================
+     */
+
+    window.oS = {
+
+      setLinear() {
+
+        if (!window.o) {
+          return;
+        }
+
+
+        for (const output of window.o) {
+
+          if (
+            output &&
+            output.color
+          ) {
+
+            output.color.mag =
+              "linear";
+
+          }
+
+        }
+
+      },
+
+
+      setNearest() {
+
+        if (!window.o) {
+          return;
+        }
+
+
+        for (const output of window.o) {
+
+          if (
+            output &&
+            output.color
+          ) {
+
+            output.color.mag =
+              "nearest";
+
+          }
+
+        }
+
+      }
+
+    };
+
+
+    /*
+     * ============================================================
+     * LOAD SCRIPT
+     * ============================================================
+     */
+
+    async function loadScript(url) {
+
+      const response =
+        await fetch(url);
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          `Failed to load script:\n${url}\n\n` +
+          `${response.status} ${response.statusText}`
+        );
+
+      }
+
+
+      const source =
+        await response.text();
+
+
+      const AsyncFunction =
+        Object.getPrototypeOf(
+          async function () {}
+        ).constructor;
+
+
+      const script =
+        new AsyncFunction(source);
+
+
+      return await script.call(window);
+
+    }
+
+
+    window.loadScript =
+      loadScript;
+
+
+    /*
+     * ============================================================
+     * RESOLUTION
+     * ============================================================
+     */
+
+    function getResolution() {
+
+      const width =
+        Number.parseInt(
+          widthInput.value,
+          10
+        );
+
+
+      const height =
+        Number.parseInt(
+          heightInput.value,
+          10
+        );
+
+
+      if (
+        !Number.isInteger(width) ||
+        width <= 0
+      ) {
+
+        throw new Error(
+          "Width must be a positive integer."
+        );
+
+      }
+
+
+      if (
+        !Number.isInteger(height) ||
+        height <= 0
+      ) {
+
+        throw new Error(
+          "Height must be a positive integer."
+        );
+
+      }
+
+
+      if (
+        width > SETTINGS.maxWidth ||
+        height > SETTINGS.maxHeight
+      ) {
+
+        throw new Error(
+          `Maximum resolution is ` +
+          `${SETTINGS.maxWidth} × ` +
+          `${SETTINGS.maxHeight}.`
+        );
+
+      }
+
+
+      return {
+        width,
+        height
+      };
+
+    }
+
+
+    function setResolution(
+      width,
+      height
+    ) {
+
+      hydra.setResolution(
+        width,
+        height
+      );
+
+
+      canvas.width =
+        width;
+
+      canvas.height =
+        height;
+
+    }
+
+
+    /*
+     * ============================================================
+     * FRAME WAIT
+     * ============================================================
+     */
+
+    function waitForFrames(count) {
+
+      return new Promise(resolve => {
+
+        let frames = 0;
+
+
+        function nextFrame() {
+
+          frames++;
+
+
+          if (
+            frames >= count
+          ) {
+
+            resolve();
+
+            return;
+
+          }
+
+
+          requestAnimationFrame(
+            nextFrame
+          );
+
+        }
+
+
+        requestAnimationFrame(
+          nextFrame
+        );
+
+      });
+
+    }
+
+
+    /*
+     * ============================================================
+     * STATUS
+     * ============================================================
+     */
+
+    function setStatus(message) {
+
+      status.textContent =
+        message;
+
+    }
+
+
+    function setButtonsDisabled(
+      disabled
+    ) {
+
+      renderButton.disabled =
+        disabled;
+
+      exportButton.disabled =
+        disabled;
+
+    }
+
+
+    /*
+     * ============================================================
+     * PATCH
+     * ============================================================
+     */
+
+    function getPatch() {
+
+      const source =
+        codeEditor.value.trim();
+
+
+      if (!source) {
+
+        throw new Error(
+          "Hydra patch is empty."
+        );
+
+      }
+
+
+      return source;
+
+    }
+
+
+    function compilePatch(source) {
+
+      const AsyncFunction =
+        Object.getPrototypeOf(
+          async function () {}
+        ).constructor;
+
+
+      try {
+
+        return new AsyncFunction(
+          source
+        );
+
+      } catch (error) {
+
+        const match =
+          error.message.match(
+            /line (\d+)/i
+          );
+
+
+        if (match) {
+
+          throw new Error(
+            `Hydra patch syntax error on line ` +
+            `${match[1]}:\n\n` +
+            error.message
+          );
+
+        }
+
+
+        throw new Error(
+          `Hydra patch syntax error:\n\n` +
+          error.message
+        );
+
+      }
+
+    }
+
+
+    async function executePatch(
+      source
+    ) {
+
+      const patch =
+        compilePatch(source);
+
+
+      return await patch.call(
+        window
+      );
+
+    }
+
+
+    /*
+     * ============================================================
+     * RENDER
+     * ============================================================
+     */
+
+    async function renderPatch() {
+
+      if (hydra.rendering) {
+        return false;
+      }
+
+
+      hydra.rendering = true;
+
+      setButtonsDisabled(true);
+
+
+      try {
+
+        const {
+          width,
+          height
+        } =
+          getResolution();
+
+
+        const source =
+          getPatch();
+
+
+        setStatus(
+          `Rendering ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()}...`
+        );
+
+
+        setResolution(
+          width,
+          height
+        );
+
+
+        /*
+         * Clear the previous shader so we know whether a new
+         * shader was actually compiled.
+         */
+
+        glslOutput.value =
+          "Compiling Hydra shader...";
+
+
+        await executePatch(
+          source
+        );
+
+
+        await waitForFrames(
+          SETTINGS.renderWaitFrames
+        );
+
+
+        /*
+         * If Hydra compiled a fragment shader, the hook above
+         * has already populated glslOutput.
+         */
+
+        if (
+          window.lastHydraFragmentShader
+        ) {
+
+          glslOutput.value =
+            window.lastHydraFragmentShader;
+
+        }
+
+
+        setStatus(
+          `Rendered ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()}`
+        );
+
+
+        return true;
+
+
+      } catch (error) {
+
+        console.error(
+          "Hydra Execution Error:",
+          error
+        );
+
+
+        setStatus(
+          "Rendering failed"
+        );
+
+
+        alert(
+          "Hydra Execution Error:\n\n" +
+          (
+            error?.stack ||
+            error?.message ||
+            error
+          )
+        );
+
+
+        return false;
+
+      } finally {
+
+        hydra.rendering =
+          false;
+
+        setButtonsDisabled(
+          false
+        );
+
+      }
+
+    }
+
+
+    /*
+     * ============================================================
+     * PNG
+     * ============================================================
+     */
+
+    function canvasToBlob() {
+
+      return new Promise(
+        (resolve, reject) => {
+
+          canvas.toBlob(
+
+            blob => {
+
+              if (!blob) {
+
+                reject(
+                  new Error(
+                    "Failed to create PNG."
+                  )
+                );
+
+                return;
+
+              }
+
+
+              resolve(blob);
+
+            },
+
+            "image/png"
+
+          );
+
+        }
+      );
+
+    }
+
+
+    function downloadBlob(
+      blob,
+      filename
+    ) {
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+
+      link.href =
+        url;
+
+      link.download =
+        filename;
+
+
+      document.body.appendChild(
+        link
+      );
+
+
+      link.click();
+
+
+      link.remove();
+
+
+      setTimeout(
+        () => {
+          URL.revokeObjectURL(
+            url
+          );
+        },
+        1000
+      );
+
+    }
+
+
+    /*
+     * ============================================================
+     * EXPORT
+     * ============================================================
+     */
+
+    async function exportPNG() {
+
+      if (hydra.rendering) {
+        return;
+      }
+
+
+      hydra.rendering =
+        true;
+
+      setButtonsDisabled(
+        true
+      );
+
+
+      try {
+
+        const {
+          width,
+          height
+        } =
+          getResolution();
+
+
+        const source =
+          getPatch();
+
+
+        setStatus(
+          `Preparing ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()} export...`
+        );
+
+
+        setResolution(
+          width,
+          height
+        );
+
+
+        /*
+         * Reset the shader display.
+         */
+
+        glslOutput.value =
+          "Compiling Hydra shader...";
+
+
+        await executePatch(
+          source
+        );
+
+
+        setStatus(
+          `Rendering ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()}...`
+        );
+
+
+        await waitForFrames(
+          SETTINGS.exportWaitFrames
+        );
+
+
+        /*
+         * Make sure the latest captured shader is visible.
+         */
+
+        if (
+          window.lastHydraFragmentShader
+        ) {
+
+          glslOutput.value =
+            window.lastHydraFragmentShader;
+
+        }
+
+
+        setStatus(
+          "Encoding PNG..."
+        );
+
+
+        const blob =
+          await canvasToBlob();
+
+
+        const filename =
+          `hydra_${width}x${height}_` +
+          `${Date.now()}.png`;
+
+
+        downloadBlob(
+          blob,
+          filename
+        );
+
+
+        const sizeMB =
+          blob.size /
+          (1024 * 1024);
+
+
+        setStatus(
+          `Exported ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()} ` +
+          `(${sizeMB.toFixed(1)} MB)`
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "Export Error:",
+          error
+        );
+
+
+        setStatus(
+          "Export failed"
+        );
+
+
+        alert(
+          "Export Error:\n\n" +
+          (
+            error?.stack ||
+            error?.message ||
+            error
+          )
+        );
+
+      } finally {
+
+        hydra.rendering =
+          false;
+
+        setButtonsDisabled(
+          false
+        );
+
+      }
+
+    }
+
+
+    /*
+     * ============================================================
+     * RESOLUTION PRESETS
+     * ============================================================
+     */
+
+    function setPreset(
+      width,
+      height
+    ) {
+
+      widthInput.value =
+        width;
+
+      heightInput.value =
+        height;
+
+    }
+
+
+    document
+      .querySelectorAll(
+        ".resolution-presets button"
+      )
+      .forEach(button => {
+
+        button.addEventListener(
+          "click",
+          async () => {
+
+            const width =
+              Number(
+                button.dataset.width
+              );
+
+
+            const height =
+              Number(
+                button.dataset.height
+              );
+
+
+            setPreset(
+              width,
+              height
+            );
+
+
+            await renderPatch();
+
+          }
+        );
+
+      });
+
+
+    /*
+     * ============================================================
+     * COPY GLSL
+     * ============================================================
+     */
+
+    copyGlslButton.addEventListener(
+      "click",
+      async () => {
+
+        const source =
+          glslOutput.value;
+
+
+        if (!source) {
+          return;
+        }
+
+
+        try {
+
+          await navigator.clipboard.writeText(
+            source
+          );
+
+
+          const originalText =
+            copyGlslButton.textContent;
+
+
+          copyGlslButton.textContent =
+            "Copied!";
+
+
+          setTimeout(
+            () => {
+
+              copyGlslButton.textContent =
+                originalText;
+
+            },
+            1000
+          );
+
+
+        } catch (error) {
+
+          console.error(
+            "Failed to copy GLSL:",
+            error
+          );
+
+        }
+
+      }
+    );
+
+
+    /*
+     * ============================================================
+     * BUTTONS
+     * ============================================================
+     */
+
+    renderButton.addEventListener(
+      "click",
+      renderPatch
+    );
+
+
+    exportButton.addEventListener(
+      "click",
+      exportPNG
+    );
+
+
+    /*
+     * ============================================================
+     * INITIALIZE
+     * ============================================================
+     */
+
+    setResolution(
+      SETTINGS.previewWidth,
+      SETTINGS.previewHeight
+    );
+
+
+    renderPatch();
+
+  </script>
+
+</body>
+</html>
