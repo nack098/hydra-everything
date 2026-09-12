@@ -12,8 +12,12 @@ declare module "hydra-synth" {
     constructor(options?: HydraOptions);
 
     rendering: boolean;
+    synth: any;
+    width: number;
+    height: number;
 
     setResolution(width: number, height: number): void;
     tick(dt: number): void;
+    stop?(): void;
   }
 }

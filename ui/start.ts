@@ -1,30 +1,37 @@
-import { join } from "node:path";
 import { spawn } from "node:child_process";
+import { index, favicon, icons } from "./embedded-assets";
 
 const port = 4173;
-const root = process.cwd();
-
-const indexPath = join(root, "dist", "index.html");
-
-if (!(await Bun.file(indexPath).exists())) {
-  console.error(`Could not find:\n${indexPath}`);
-  console.error("");
-  console.error("Make sure you ran:");
-  console.error("  bun run build");
-  process.exit(1);
-}
 
 const server = Bun.serve({
   hostname: "127.0.0.1",
   port,
 
-  async fetch(request) {
+  fetch(request) {
     const url = new URL(request.url);
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      return new Response(Bun.file(indexPath), {
+      return new Response(index, {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-cache",
+        },
+      });
+    }
+
+    if (url.pathname === "/favicon.svg") {
+      return new Response(favicon, {
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Cache-Control": "no-cache",
+        },
+      });
+    }
+
+    if (url.pathname === "/icons.svg") {
+      return new Response(icons, {
+        headers: {
+          "Content-Type": "image/svg+xml",
           "Cache-Control": "no-cache",
         },
       });
