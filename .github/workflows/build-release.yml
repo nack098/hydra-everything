@@ -1,0 +1,70 @@
+name: Build-Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 1.0.0)"
+        required: true
+        type: string
+
+      dry-run:
+        description: "Build only; skip GitHub release"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    name: Build Windows Executable
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        working-directory: ui
+
+    steps:
+      - name: Checkout Source Tree
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build Hydra Exporter
+        run: bun run build
+
+      - name: Verify Executable
+        shell: pwsh
+        run: |
+          if (!(Test-Path "./HydraExporter.exe")) {
+            Write-Error "HydraExporter.exe was not produced."
+            exit 1
+          }
+
+          $size = (Get-Item "./HydraExporter.exe").Length
+          Write-Host "HydraExporter.exe size: $size bytes"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: HydraExporter-v${{ inputs.version }}
+          path: ui/HydraExporter.exe
+          retention-days: 7
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry-run }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Hydra Exporter v${{ inputs.version }}
+          generate_release_notes: true
+          files: ui/HydraExporter.exe
