@@ -8,6 +8,7 @@ export interface HydraOutput {
 
 export interface HydraGlobals {
   hydra?: Hydra;
+  hydraSynth?: Hydra;
   o?: HydraOutput[];
 
   oS: {

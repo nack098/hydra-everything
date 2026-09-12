@@ -83,7 +83,7 @@ export class RenderStateCapture {
    * Persistent pass definitions are intentionally kept.
    */
   beginFrame(): void {
-    console.log("[CAPTURE] ===== BEGIN FRAME =====");
+    // console.log("[CAPTURE] ===== BEGIN FRAME =====");
 
     this.passes.length = 0;
     this.outputs = [];
@@ -127,7 +127,7 @@ export class RenderStateCapture {
    * not mean that the command has executed yet.
    */
   beginPass(outputId: number, outputLabel: string, pass: HydraPassInput): void {
-    console.log(`[CAPTURE] define pass o${outputId}`);
+    // console.log(`[CAPTURE] define pass o${outputId}`);
 
     const staticUniforms: Record<string, HydraUniform> = {};
 
@@ -183,9 +183,9 @@ export class RenderStateCapture {
     const captured = this.outputPasses.get(outputId);
 
     if (!captured) {
-      console.warn(
-        `[CAPTURE] texture read without pass: ` + `o${outputId}.${uniform}`,
-      );
+      // console.warn(
+      //   `[CAPTURE] texture read without pass: ` + `o${outputId}.${uniform}`,
+      // );
 
       return;
     }
@@ -222,9 +222,9 @@ export class RenderStateCapture {
     const captured = this.outputPasses.get(outputId);
 
     if (!captured) {
-      console.warn(
-        `[CAPTURE] write without pass: ` + `o${outputId} / FBO ${bufferIndex}`,
-      );
+      // console.warn(
+      //   `[CAPTURE] write without pass: ` + `o${outputId} / FBO ${bufferIndex}`,
+      // );
 
       return;
     }
@@ -248,9 +248,9 @@ export class RenderStateCapture {
     const captured = this.outputPasses.get(outputId);
 
     if (!captured) {
-      console.warn(
-        `[CAPTURE] uniform without pass: ` + `o${outputId}.${uniform}`,
-      );
+      // console.warn(
+      //   `[CAPTURE] uniform without pass: ` + `o${outputId}.${uniform}`,
+      // );
 
       return;
     }
@@ -258,17 +258,17 @@ export class RenderStateCapture {
     const converted = this.toHydraUniform(value);
 
     if (!converted) {
-      console.warn(
-        `[CAPTURE] unsupported uniform ` + `o${outputId}.${uniform}`,
-        value,
-      );
+      // console.warn(
+      //   `[CAPTURE] unsupported uniform ` + `o${outputId}.${uniform}`,
+      //   value,
+      // );
 
       return;
     }
 
     captured.uniforms[uniform] = converted;
 
-    console.log(`[CAPTURE] uniform ${uniform} o${outputId}`, converted);
+    // console.log(`[CAPTURE] uniform ${uniform} o${outputId}`, converted);
   }
 
   /**
@@ -278,17 +278,17 @@ export class RenderStateCapture {
     const captured = this.outputPasses.get(outputId);
 
     if (!captured) {
-      console.warn(
-        `[CAPTURE] endPass: no pass definition ` + `for output ${outputId}`,
-      );
+      // console.warn(
+      //   `[CAPTURE] endPass: no pass definition ` + `for output ${outputId}`,
+      // );
 
       return;
     }
 
     if (!captured.write) {
-      console.warn(
-        `[CAPTURE] endPass: pass o${outputId} ` + `has no write target`,
-      );
+      // console.warn(
+      //   `[CAPTURE] endPass: pass o${outputId} ` + `has no write target`,
+      // );
 
       return;
     }

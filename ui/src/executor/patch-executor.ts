@@ -39,7 +39,6 @@ export class PatchExecutor {
     }
 
     const source = await response.text();
-
     const script = new this.AsyncFunction(source);
 
     return await script.call(window);
@@ -50,12 +49,11 @@ export class PatchExecutor {
       return new this.AsyncFunction(source) as HydraPatch;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-
       const match = message.match(/line (\d+)/i);
 
       if (match) {
         throw new Error(
-          `Hydra patch syntax error on line ` + `${match[1]}:\n\n${message}`,
+          `Hydra patch syntax error on line ${match[1]}:\n\n${message}`,
         );
       }
 
