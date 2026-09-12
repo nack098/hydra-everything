@@ -2284,8 +2284,11 @@ function ToolWindow({
               h-full
               w-1
               cursor-col-resize
-              transition-opacity
+              bg-transparent
+              transition-colors
               duration-200
+              hover:bg-ctp-blue
+              active:bg-ctp-blue
               ${open
                 ? 'opacity-100'
                 : 'pointer-events-none opacity-0'
