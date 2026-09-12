@@ -12,7 +12,7 @@ import {
   Query,
 } from 'web-tree-sitter'
 
-import { createUnitConverter } from "./extensions/unit-converter"
+import { createUnitConverter } from './extensions/unit-converter'
 
 import Hydra from 'hydra-synth'
 
@@ -437,6 +437,12 @@ function createSeededRandom(
   }
 }
 
+function createRandomSeed() {
+  return Math.floor(
+    Math.random() * 0x100000000,
+  ) >>> 0
+}
+
 async function executeHydraCode(
   source: string,
   width: number,
@@ -459,10 +465,7 @@ async function executeHydraCode(
     })
 
   const previousUnits =
-    new Map<
-      string,
-      unknown
-    >()
+    new Map<string, unknown>()
 
   for (const [name, value] of Object.entries(units)) {
     previousUnits.set(
@@ -470,8 +473,7 @@ async function executeHydraCode(
       (window as any)[name],
     )
 
-      ; (window as any)[name] =
-        value
+      ; (window as any)[name] = value
   }
 
   const originalRandom =
@@ -1449,7 +1451,7 @@ function ExportPanel({
   const [
     seed,
     setSeed,
-  ] = useState(123456)
+  ] = useState(createRandomSeed)
 
   const [
     totalFrames,
@@ -1460,6 +1462,11 @@ function ExportPanel({
     fps,
     setFps,
   ] = useState(60)
+
+  const [
+    warmupFrames,
+    setWarmupFrames,
+  ] = useState(30)
 
   const [
     progress,
@@ -1478,9 +1485,7 @@ function ExportPanel({
     width: number,
     height: number,
   ) => {
-    if (
-      !outputCanvas.current
-    ) {
+    if (!outputCanvas.current) {
       outputCanvas.current =
         document.createElement(
           'canvas',
@@ -1580,12 +1585,49 @@ function ExportPanel({
 
     await executeHydraCode(
       code,
-      renderWidth,
-      renderHeight,
+      canvas.width,
+      canvas.height,
       seed,
     )
 
-    hydra.tick(0)
+    const warmupCount =
+      Math.max(
+        0,
+        Math.floor(
+          warmupFrames,
+        ),
+      )
+
+    const warmupFrameRate =
+      mode === 'sequence'
+        ? Math.max(1, fps)
+        : 60
+
+    const warmupFrameDuration =
+      1000 /
+      warmupFrameRate
+
+    for (
+      let warmup = 0;
+      warmup < warmupCount;
+      warmup++
+    ) {
+      setProgress(
+        `Warming up ${warmup + 1} / ${warmupCount}`,
+      )
+
+      hydra.tick(
+        warmupFrameDuration,
+      )
+
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            0,
+          ),
+      )
+    }
   }
 
   const restorePreview = (
@@ -1641,9 +1683,7 @@ function ExportPanel({
         hydra,
       )
 
-      if (
-        mode === 'single'
-      ) {
+      if (mode === 'single') {
         setProgress(
           'Rendering frame…',
         )
@@ -1684,7 +1724,7 @@ function ExportPanel({
           fps,
         )
 
-      const dt =
+      const frameDuration =
         1000 /
         frameRate
 
@@ -1698,7 +1738,9 @@ function ExportPanel({
         )
 
         if (frame > 0) {
-          hydra.tick(dt)
+          hydra.tick(
+            frameDuration,
+          )
         }
 
         const blob =
@@ -1709,7 +1751,9 @@ function ExportPanel({
           )
 
         zip.file(
-          `frame-${String(frame).padStart(6, '0')}.png`,
+          `frame-${String(
+            frame,
+          ).padStart(6, '0')}.png`,
           blob,
         )
 
@@ -1738,7 +1782,7 @@ function ExportPanel({
       )
 
       setProgress(
-        'Export complete',
+        `Export complete — ${frameCount} frames`,
       )
     } catch (error) {
       const message =
@@ -1824,7 +1868,8 @@ function ExportPanel({
                   font-mono
                   text-xs
                   transition
-                  ${mode === 'single'
+                  ${mode ===
+                    'single'
                     ? 'bg-ctp-blue text-ctp-crust'
                     : 'bg-ctp-surface0 text-ctp-subtext0 hover:bg-ctp-surface1 hover:text-ctp-text'
                   }
@@ -1883,12 +1928,20 @@ function ExportPanel({
 
             <input
               type="number"
+              min={0}
+              max={4294967295}
               value={seed}
               onChange={event =>
                 setSeed(
-                  Number(
-                    event.target.value,
-                  ) || 0,
+                  Math.max(
+                    0,
+                    Math.min(
+                      4294967295,
+                      Number(
+                        event.target.value,
+                      ) || 0,
+                    ),
+                  ),
                 )
               }
               className="
@@ -1905,8 +1958,81 @@ function ExportPanel({
               "
             />
 
+            <button
+              onClick={() =>
+                setSeed(
+                  createRandomSeed(),
+                )
+              }
+              className="
+                mt-2
+                w-full
+                rounded
+                bg-ctp-surface0
+                px-3
+                py-2
+                font-mono
+                text-xs
+                text-ctp-subtext0
+                transition
+                hover:bg-ctp-surface1
+                hover:text-ctp-text
+              "
+            >
+              Randomize Seed
+            </button>
+
             <div className="mt-1 font-mono text-[10px] text-ctp-overlay1">
               Used for deterministic Math.random()
+            </div>
+          </div>
+
+          <div>
+            <div className="font-mono text-xs text-ctp-subtext0">
+              Warm-up
+            </div>
+
+            <label className="mt-2 block rounded bg-ctp-surface0 p-3">
+              <div className="font-mono text-xs text-ctp-overlay1">
+                Frames
+              </div>
+
+              <input
+                type="number"
+                min={0}
+                value={
+                  warmupFrames
+                }
+                onChange={event =>
+                  setWarmupFrames(
+                    Math.max(
+                      0,
+                      Number(
+                        event.target.value,
+                      ) || 0,
+                    ),
+                  )
+                }
+                className="
+                  mt-1
+                  w-full
+                  bg-transparent
+                  font-mono
+                  text-sm
+                  text-ctp-text
+                  outline-none
+                "
+              />
+
+              <div className="mt-1 font-mono text-[10px] text-ctp-overlay1">
+                Frames rendered before frame 0 to initialize feedback buffers.
+              </div>
+            </label>
+
+            <div className="mt-2 font-mono text-[10px] text-ctp-overlay1">
+              {mode === 'sequence'
+                ? `Warm-up: ${(Math.max(0, warmupFrames) / Math.max(1, fps)).toFixed(2)}s @ ${fps} FPS`
+                : `Warm-up: ${(Math.max(0, warmupFrames) / 60).toFixed(2)}s @ 60 FPS`}
             </div>
           </div>
 
@@ -1934,20 +2060,21 @@ function ExportPanel({
                           Math.max(
                             1,
                             Number(
-                              event.target.value,
+                              event.target
+                                .value,
                             ) || 1,
                           ),
                         )
                       }
                       className="
-                      mt-1
-                      w-full
-                      bg-transparent
-                      font-mono
-                      text-sm
-                      text-ctp-text
-                      outline-none
-                    "
+                        mt-1
+                        w-full
+                        bg-transparent
+                        font-mono
+                        text-sm
+                        text-ctp-text
+                        outline-none
+                      "
                     />
                   </label>
 
@@ -1965,20 +2092,21 @@ function ExportPanel({
                           Math.max(
                             1,
                             Number(
-                              event.target.value,
+                              event.target
+                                .value,
                             ) || 1,
                           ),
                         )
                       }
                       className="
-                      mt-1
-                      w-full
-                      bg-transparent
-                      font-mono
-                      text-sm
-                      text-ctp-text
-                      outline-none
-                    "
+                        mt-1
+                        w-full
+                        bg-transparent
+                        font-mono
+                        text-sm
+                        text-ctp-text
+                        outline-none
+                      "
                     />
                   </label>
                 </div>
@@ -2656,9 +2784,6 @@ function CodingPage() {
   const animationFrame =
     useRef<number | null>(null)
 
-  const lastFrameTime =
-    useRef<number | null>(null)
-
   useEffect(() => {
     let mounted = true
 
@@ -2767,34 +2892,16 @@ function CodingPage() {
       return
     }
 
-    lastFrameTime.current =
-      null
+    const frameDuration =
+      1000 / 60
 
-    const loop = (
-      timestamp: number,
-    ) => {
+    const loop = () => {
       if (
         !exportingRef.current
       ) {
-        const previous =
-          lastFrameTime.current
-
-        const dt =
-          previous === null
-            ? 16.6667
-            : Math.min(
-              100,
-              timestamp -
-              previous,
-            )
-
-        lastFrameTime.current =
-          timestamp
-
-        hydra.tick(dt)
-      } else {
-        lastFrameTime.current =
-          null
+        hydra.tick(
+          frameDuration,
+        )
       }
 
       animationFrame.current =

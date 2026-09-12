@@ -15,6 +15,7 @@ declare module "hydra-synth" {
     synth: any;
     width: number;
     height: number;
+    time: any;
 
     setResolution(width: number, height: number): void;
     tick(dt: number): void;
