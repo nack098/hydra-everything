@@ -12,6 +12,8 @@ import {
   Query,
 } from 'web-tree-sitter'
 
+import { createUnitConverter } from "./extensions/unit-converter"
+
 import Hydra from 'hydra-synth'
 
 import JSZip from 'jszip'
@@ -437,6 +439,8 @@ function createSeededRandom(
 
 async function executeHydraCode(
   source: string,
+  width: number,
+  height: number,
   seed?: number,
 ): Promise<unknown> {
   const AsyncFunction =
@@ -447,21 +451,54 @@ async function executeHydraCode(
   const script =
     new AsyncFunction(source)
 
-  if (seed === undefined) {
-    return await script.call(window)
+  const units =
+    createUnitConverter({
+      width,
+      height,
+      rootFontSize: 12,
+    })
+
+  const previousUnits =
+    new Map<
+      string,
+      unknown
+    >()
+
+  for (const [name, value] of Object.entries(units)) {
+    previousUnits.set(
+      name,
+      (window as any)[name],
+    )
+
+      ; (window as any)[name] =
+        value
   }
 
   const originalRandom =
     Math.random
 
-  Math.random =
-    createSeededRandom(seed)
-
   try {
+    if (seed !== undefined) {
+      Math.random =
+        createSeededRandom(seed)
+    }
+
     return await script.call(window)
   } finally {
     Math.random =
       originalRandom
+
+    for (const name of Object.keys(units)) {
+      const previous =
+        previousUnits.get(name)
+
+      if (previous === undefined) {
+        delete (window as any)[name]
+      } else {
+        ; (window as any)[name] =
+          previous
+      }
+    }
   }
 }
 
@@ -1543,6 +1580,8 @@ function ExportPanel({
 
     await executeHydraCode(
       code,
+      renderWidth,
+      renderHeight,
       seed,
     )
 
@@ -2794,6 +2833,8 @@ function CodingPage() {
 
     executeHydraCode(
       runCode,
+      renderWidth,
+      renderHeight,
     )
       .then(() => {
         setDebug(entries => [
