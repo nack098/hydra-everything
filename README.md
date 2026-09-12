@@ -1,7 +1,8 @@
 
 # hydra-everything
 
-[![GitHub Actions](https://github.com/nack098/hydra-everything/.github/actions/workflows/build-release.yml/badge.svg)](https://github.com/nack098/.github/hydra-everything/actions) [![Releases](https://img.shields.io/github/release/nack098/hydra-everything.svg)](https://github.com/nack098/hydra-everything/releases)
+[![GitHub Actions](https://github.com/nack098/hydra-everything/actions/workflows/build-release.yml/badge.svg)](https://github.com/nack098/hydra-everything/actions)
+[![Releases](https://img.shields.io/github/release/nack098/hydra-everything.svg)](https://github.com/nack098/hydra-everything/releases)
 
 Export Hydra to After Effects, PNG, or more.
 
