@@ -14,6 +14,9 @@ export class HydraUI {
 
   private readonly codeEditor: HTMLTextAreaElement;
 
+  private readonly previewWidthInput: HTMLInputElement;
+  private readonly previewHeightInput: HTMLInputElement;
+
   private readonly widthInput: HTMLInputElement;
   private readonly heightInput: HTMLInputElement;
 
@@ -34,6 +37,12 @@ export class HydraUI {
     this.canvas = this.requireElement<HTMLCanvasElement>("hydraCanvas");
 
     this.codeEditor = this.requireElement<HTMLTextAreaElement>("hydraCode");
+
+    this.previewWidthInput =
+      this.requireElement<HTMLInputElement>("previewWidth");
+
+    this.previewHeightInput =
+      this.requireElement<HTMLInputElement>("previewHeight");
 
     this.widthInput = this.requireElement<HTMLInputElement>("resWidth");
 
@@ -73,6 +82,28 @@ export class HydraUI {
     return source;
   }
 
+  getPreviewResolution(): Resolution {
+    const width = this.parseInteger(
+      this.previewWidthInput.value,
+      "Preview width",
+    );
+
+    const height = this.parseInteger(
+      this.previewHeightInput.value,
+      "Preview height",
+    );
+
+    return {
+      width,
+      height,
+    };
+  }
+
+  setPreviewResolution(width: number, height: number): void {
+    this.previewWidthInput.value = String(width);
+    this.previewHeightInput.value = String(height);
+  }
+
   getResolution(): Resolution {
     const width = this.parseInteger(this.widthInput.value, "Width");
 
@@ -86,7 +117,6 @@ export class HydraUI {
 
   setResolution(width: number, height: number): void {
     this.widthInput.value = String(width);
-
     this.heightInput.value = String(height);
   }
 
@@ -121,9 +151,7 @@ export class HydraUI {
 
   setRendering(rendering: boolean): void {
     this.renderButton.disabled = rendering;
-
     this.exportButton.disabled = rendering;
-
     this.exportFramesButton.disabled = rendering;
   }
 
@@ -149,6 +177,29 @@ export class HydraUI {
     this.copyGlslButton.addEventListener("click", () => {
       void this.copyGLSL();
     });
+  }
+
+  onPreviewResolutionChange(callback: () => void | Promise<void>): void {
+    const handleChange = (): void => {
+      const width = Number(this.previewWidthInput.value);
+
+      const height = Number(this.previewHeightInput.value);
+
+      if (
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width <= 0 ||
+        height <= 0
+      ) {
+        return;
+      }
+
+      void callback(width, height);
+    };
+
+    this.previewWidthInput.addEventListener("change", handleChange);
+
+    this.previewHeightInput.addEventListener("change", handleChange);
   }
 
   onResolutionPreset(

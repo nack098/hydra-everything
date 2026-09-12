@@ -15,6 +15,7 @@ export const SETTINGS = {
   rendering: {
     previewWaitFrames: 5,
     exportWaitFrames: 1,
+    warmupFrames: 10,
   },
 } as const;
 

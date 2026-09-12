@@ -1,45 +1,58 @@
 import JSZip from "jszip";
+
 import { DEFAULT_PATCH, DEFAULT_VALUES, SETTINGS } from "../config/settings";
+
 import { PatchExecutor } from "../executor/patch-executor";
 import { PNGGenerator } from "../generator/png-generator";
+
 import type { Renderer } from "../renderer/renderer";
 import { WebGLRenderer } from "../renderer/webgl-renderer";
+import type { RenderTarget } from "../renderer/render-target";
+
 import { HydraUI } from "../ui/hydra-ui";
+
 import { downloadBlob } from "../utils/download";
 import { waitForFrames, yieldToBrowser } from "../utils/wait";
 
 export class HydraApp {
   private readonly ui: HydraUI;
-  private readonly executor: PatchExecutor;
   private readonly pngGenerator: PNGGenerator;
 
   private renderer: Renderer;
+  private executor: PatchExecutor;
 
   private rendering = false;
 
+  private patchRevision = 0;
+
   constructor() {
     this.ui = new HydraUI();
-    this.executor = new PatchExecutor();
     this.pngGenerator = new PNGGenerator();
 
-    const resolution = DEFAULT_VALUES.resolution;
+    this.executor = new PatchExecutor();
+
+    const preview = SETTINGS.preview;
 
     this.renderer = new WebGLRenderer(
       this.ui.canvas,
-      resolution.width,
-      resolution.height,
+      preview.width,
+      preview.height,
     );
 
     this.initialize();
   }
 
   async start(): Promise<void> {
-    this.startPreview();
     await this.renderPatch();
   }
 
   private initialize(): void {
     this.ui.setPatch(DEFAULT_PATCH);
+
+    this.ui.setPreviewResolution(
+      SETTINGS.preview.width,
+      SETTINGS.preview.height,
+    );
 
     this.ui.setResolution(
       DEFAULT_VALUES.resolution.width,
@@ -60,9 +73,11 @@ export class HydraApp {
 
     this.ui.onCopyGLSL();
 
-    this.ui.onResolutionPreset(() => {
-      void this.renderPatch();
+    this.ui.onPreviewResolutionChange(() => {
+      void this.changePreviewResolution();
     });
+
+    this.ui.onResolutionPreset(() => {});
   }
 
   private async renderPatch(): Promise<boolean> {
@@ -74,25 +89,28 @@ export class HydraApp {
     this.ui.setRendering(true);
 
     try {
-      const { width, height } = this.ui.getResolution();
-
+      const { width, height } = this.ui.getPreviewResolution();
       const { seed } = this.ui.getAnimationSettings();
-
       const source = this.ui.getPatch();
 
       this.ui.setStatus(
-        `Rendering ${width.toLocaleString()} × ${height.toLocaleString()}...`,
+        `Rendering preview ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()}...`,
       );
 
       this.replaceRenderer(width, height);
 
       const renderer = this.requireWebGLRenderer();
 
-      renderer.stopPreview();
-
       this.ui.setGLSL("Compiling Hydra shader...");
 
-      await this.executeOnRenderer(renderer, source, seed);
+      await this.executeOnRenderer(
+        renderer,
+        this.executor,
+        source,
+        seed,
+      );
 
       const target = renderer.createTarget();
 
@@ -102,23 +120,32 @@ export class HydraApp {
 
       await waitForFrames(SETTINGS.rendering.previewWaitFrames);
 
-      this.printRenderState(renderer);
+      // this.printRenderState(renderer);
 
       renderer.startPreview();
 
       this.ui.setStatus(
-        `Rendered ${width.toLocaleString()} × ${height.toLocaleString()}`,
+        `Rendered preview ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()}`,
       );
 
       return true;
     } catch (error: unknown) {
       this.handleError("Hydra Execution Error", "Rendering failed", error);
-
       return false;
     } finally {
       this.rendering = false;
       this.ui.setRendering(false);
     }
+  }
+
+  private async changePreviewResolution(): Promise<void> {
+    if (this.rendering) {
+      return;
+    }
+
+    await this.renderPatch();
   }
 
   private async exportPNG(): Promise<void> {
@@ -131,57 +158,98 @@ export class HydraApp {
 
     this.stopPreview();
 
+    let renderer: WebGLRenderer | undefined;
+    let executor: PatchExecutor | undefined;
+    let container: HTMLDivElement | undefined;
+
     try {
+      const previewRenderer = this.requireWebGLRenderer();
+      const currentTime = previewRenderer.getTime();
+
       const { width, height } = this.ui.getResolution();
-
-      const { fps, seed } = this.ui.getAnimationSettings();
-
+      const { seed } = this.ui.getAnimationSettings();
       const source = this.ui.getPatch();
 
+      this.patchRevision++;
+
       this.ui.setStatus(
-        `Preparing ${width.toLocaleString()} × ${height.toLocaleString()} export...`,
+        `Preparing ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()} ` +
+          `at t=${currentTime.toFixed(3)}...`,
       );
 
-      const renderer = this.createExportRenderer(width, height);
+      container = this.createTemporaryRenderContainer();
 
-      try {
-        this.ui.setGLSL("Compiling Hydra shader...");
+      const canvas = document.createElement("canvas");
 
-        await this.executeOnRenderer(renderer, source, seed);
+      canvas.width = width;
+      canvas.height = height;
 
-        const target = renderer.createTarget();
+      container.appendChild(canvas);
 
-        this.ui.setStatus(
-          `Rendering ${width.toLocaleString()} × ${height.toLocaleString()}...`,
-        );
+      executor = new PatchExecutor();
+      renderer = new WebGLRenderer(canvas, width, height);
 
-        renderer.render(1000 / fps, target);
+      this.ui.setGLSL("Compiling Hydra shader...");
 
-        this.updateGLSL(renderer);
+      await this.executeOnRenderer(
+        renderer,
+        executor,
+        source,
+        seed,
+      );
 
-        await waitForFrames(SETTINGS.rendering.exportWaitFrames);
+      const target = renderer.createTarget();
 
-        this.ui.setStatus("Encoding PNG...");
+      const frameDeltaTime = 1000 / this.ui.getAnimationSettings().fps;
 
-        const blob = await this.pngGenerator.generate(target);
+      this.ui.setStatus("Warming up renderer...");
 
-        const filename = `hydra_${width}x${height}_${Date.now()}.png`;
+      this.warmupRenderer(renderer, target);
 
-        downloadBlob(blob, filename);
+      renderer.render(0, target);
 
-        const sizeMB = blob.size / (1024 * 1024);
+      const epsilon = 0.000001;
 
-        this.ui.setStatus(
-          `Exported ${width.toLocaleString()} × ` +
-            `${height.toLocaleString()} ` +
-            `(${sizeMB.toFixed(1)} MB)`,
-        );
-      } finally {
-        renderer.dispose();
+      while (renderer.getTime() + epsilon < currentTime) {
+        const remaining = currentTime - renderer.getTime();
+        const deltaTime = Math.min(frameDeltaTime, remaining * 1000);
+
+        renderer.render(deltaTime, target);
       }
+
+      this.updateGLSL(renderer);
+
+      await waitForFrames(SETTINGS.rendering.exportWaitFrames);
+
+      this.ui.setStatus("Encoding PNG...");
+
+      const blob = await this.pngGenerator.generate(target);
+
+      const filename =
+        `hydra_${width}x${height}_` +
+        `time${currentTime.toFixed(3)}_` +
+        `${Date.now()}.png`;
+
+      downloadBlob(blob, filename);
+
+      const sizeMB = blob.size / (1024 * 1024);
+
+      this.ui.setStatus(
+        `Exported current frame ` +
+          `at t=${currentTime.toFixed(3)} ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()} ` +
+          `(${sizeMB.toFixed(1)} MB)`,
+      );
     } catch (error: unknown) {
       this.handleError("Export Error", "Export failed", error);
     } finally {
+      executor?.dispose();
+      renderer?.dispose();
+      container?.remove();
+
       this.rendering = false;
       this.ui.setRendering(false);
 
@@ -199,133 +267,175 @@ export class HydraApp {
 
     this.stopPreview();
 
+    let renderer: WebGLRenderer | undefined;
+    let executor: PatchExecutor | undefined;
+
     try {
       const { width, height } = this.ui.getResolution();
-
       const { frameCount, fps, seed } = this.ui.getAnimationSettings();
-
       const source = this.ui.getPatch();
 
+      this.patchRevision++;
+
       this.ui.setStatus(
-        `Preparing ${width.toLocaleString()} × ` +
-          `${height.toLocaleString()} frame export...`,
+        `Preparing ` +
+          `${width.toLocaleString()} × ` +
+          `${height.toLocaleString()} ` +
+          `frame export...`,
       );
 
-      const renderer = this.createExportRenderer(width, height);
+      executor = new PatchExecutor();
+      renderer = new WebGLRenderer(this.ui.canvas, width, height);
 
-      try {
-        this.ui.setGLSL("Compiling Hydra shader...");
+      this.ui.setGLSL("Compiling Hydra shader...");
 
-        await this.executeOnRenderer(renderer, source, seed);
+      await this.executeOnRenderer(
+        renderer,
+        executor,
+        source,
+        seed,
+      );
 
-        const target = renderer.createTarget();
+      const target = renderer.createTarget();
 
-        const zip = new JSZip();
+      const frameDeltaTime = 1000 / fps;
 
-        const frames = zip.folder("frames");
+      const zip = new JSZip();
 
-        if (!frames) {
-          throw new Error("Failed to create frame folder.");
-        }
+      const frames = zip.folder("frames");
 
-        const frameDeltaTime = 1000 / fps;
+      if (!frames) {
+        throw new Error("Failed to create frame folder.");
+      }
 
-        for (let frame = 0; frame < frameCount; frame++) {
+      this.ui.setStatus("Warming up renderer...");
+
+      this.warmupRenderer(renderer, target);
+
+      for (let frame = 0; frame < frameCount; frame++) {
+        if (frame === 0) {
+          renderer.render(0, target);
+        } else {
           renderer.render(frameDeltaTime, target);
-
-          const png = await this.pngGenerator.generate(target);
-
-          frames.file(`frame_${String(frame).padStart(6, "0")}.png`, png);
-
-          this.ui.setStatus(
-            `Rendering frame ` +
-              `${(frame + 1).toLocaleString()} / ` +
-              `${frameCount.toLocaleString()} ` +
-              `(${fps} FPS)...`,
-          );
-
-          await yieldToBrowser();
         }
 
         this.updateGLSL(renderer);
 
-        this.ui.setStatus("Encoding ZIP...");
+        await yieldToBrowser();
 
-        const zipBlob = await zip.generateAsync({
-          type: "blob",
-          compression: "STORE",
-        });
+        const png = await this.pngGenerator.generate(target);
 
-        const filename =
-          `hydra_${width}x${height}_` +
-          `${frameCount}frames_` +
-          `${fps}fps_` +
-          `seed${seed}_` +
-          `${Date.now()}.zip`;
-
-        downloadBlob(zipBlob, filename);
-
-        const sizeMB = zipBlob.size / (1024 * 1024);
+        frames.file(
+          `frame_${String(frame).padStart(6, "0")}.png`,
+          png,
+        );
 
         this.ui.setStatus(
-          `Exported ${frameCount.toLocaleString()} frames ` +
-            `at ${fps} FPS with seed ${seed} ` +
-            `(${sizeMB.toFixed(1)} MB)`,
+          `Rendering frame ` +
+            `${(frame + 1).toLocaleString()} / ` +
+            `${frameCount.toLocaleString()} ` +
+            `(${fps} FPS)...`,
         );
-      } finally {
-        renderer.dispose();
+
+        await yieldToBrowser();
       }
+
+      this.ui.setStatus("Encoding ZIP...");
+
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "STORE",
+      });
+
+      const filename =
+        `hydra_${width}x${height}_` +
+        `${frameCount}frames_` +
+        `${fps}fps_` +
+        `seed${seed}_` +
+        `${Date.now()}.zip`;
+
+      downloadBlob(zipBlob, filename);
+
+      const sizeMB = zipBlob.size / (1024 * 1024);
+
+      this.ui.setStatus(
+        `Exported ` +
+          `${frameCount.toLocaleString()} frames ` +
+          `at ${fps} FPS ` +
+          `with seed ${seed} ` +
+          `(${sizeMB.toFixed(1)} MB)`,
+      );
     } catch (error: unknown) {
       this.handleError("Frame Export Error", "Frame export failed", error);
     } finally {
+      executor?.dispose();
+      renderer?.dispose();
+
       this.rendering = false;
       this.ui.setRendering(false);
 
-      this.startPreview();
+      await this.renderPatch();
     }
   }
 
-  private replaceRenderer(width: number, height: number): void {
+  private warmupRenderer(
+    renderer: Renderer,
+    target: RenderTarget,
+  ): void {
+    for (
+      let frame = 0;
+      frame < SETTINGS.rendering.warmupFrames;
+      frame++
+    ) {
+      renderer.render(0, target);
+    }
+  }
+
+  private createTemporaryRenderContainer(): HTMLDivElement {
+    const container = document.createElement("div");
+
+    container.style.position = "fixed";
+    container.style.left = "-100000px";
+    container.style.top = "0";
+    container.style.width = "1px";
+    container.style.height = "1px";
+    container.style.overflow = "hidden";
+    container.style.pointerEvents = "none";
+    container.style.opacity = "0";
+
+    document.body.appendChild(container);
+
+    return container;
+  }
+
+  private replaceRenderer(
+    width: number,
+    height: number,
+  ): void {
     this.stopPreview();
+
+    this.executor.dispose();
 
     if (this.renderer instanceof WebGLRenderer) {
       this.renderer.dispose();
     }
 
-    this.renderer = new WebGLRenderer(this.ui.canvas, width, height);
-  }
+    this.executor = new PatchExecutor();
 
-  private createExportRenderer(width: number, height: number): WebGLRenderer {
-    const canvas = document.createElement("canvas");
-
-    canvas.width = width;
-    canvas.height = height;
-
-    return new WebGLRenderer(canvas, width, height);
+    this.renderer = new WebGLRenderer(
+      this.ui.canvas,
+      width,
+      height,
+    );
   }
 
   private async executeOnRenderer(
-    renderer: WebGLRenderer,
+    _renderer: WebGLRenderer,
+    executor: PatchExecutor,
     source: string,
     seed?: number,
   ): Promise<void> {
-    const previousHydra = window.hydra;
-
-    const previousHydraSynth = window.hydraSynth;
-
-    const hydra = renderer.getHydra();
-
-    window.hydra = hydra;
-
-    window.hydraSynth = hydra;
-
-    try {
-      await this.executor.execute(source, seed);
-    } finally {
-      window.hydra = previousHydra;
-
-      window.hydraSynth = previousHydraSynth;
-    }
+    await executor.execute(source, seed);
   }
 
   private requireWebGLRenderer(): WebGLRenderer {
@@ -336,8 +446,16 @@ export class HydraApp {
     return this.renderer;
   }
 
-  private printRenderState(renderer: WebGLRenderer): void {
-    console.log(JSON.stringify(renderer.getRenderState().getState(), null, 2));
+  private printRenderState(
+    renderer: WebGLRenderer,
+  ): void {
+    console.log(
+      JSON.stringify(
+        renderer.getRenderState().getState(),
+        null,
+        2,
+      ),
+    );
   }
 
   private startPreview(): void {
@@ -352,7 +470,9 @@ export class HydraApp {
     }
   }
 
-  private updateGLSL(renderer: WebGLRenderer): void {
+  private updateGLSL(
+    renderer: WebGLRenderer,
+  ): void {
     const source = renderer.getFragmentShader();
 
     if (source) {
@@ -360,13 +480,19 @@ export class HydraApp {
     }
   }
 
-  private handleError(title: string, status: string, error: unknown): void {
+  private handleError(
+    title: string,
+    status: string,
+    error: unknown,
+  ): void {
     console.error(title, error);
 
     this.ui.setStatus(status);
 
     const message =
-      error instanceof Error ? (error.stack ?? error.message) : String(error);
+      error instanceof Error
+        ? (error.stack ?? error.message)
+        : String(error);
 
     alert(`${title}:\n\n${message}`);
   }
