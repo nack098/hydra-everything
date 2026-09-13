@@ -28,8 +28,8 @@ export default function Preview({
       }
       className={`
         ${fullscreen
-          ? 'fixed inset-0 z-100'
-          : 'absolute inset-y-0 right-0 z-0'
+          ? "fixed inset-0 z-100"
+          : "absolute inset-y-0 right-0 z-0"
         }
         flex
         min-w-0
@@ -44,39 +44,32 @@ export default function Preview({
     >
       <canvas
         ref={canvasRef}
-        style={{
-          width: fullscreen
-            ? '100%'
-            : `${previewWidth}px`,
-          height: fullscreen
-            ? '100%'
-            : `${previewHeight}px`,
-          maxWidth: fullscreen
-            ? 'none'
-            : '100%',
-          maxHeight: fullscreen
-            ? 'none'
-            : '100%',
-        }}
-        className="
+        width={previewWidth}
+        height={previewHeight}
+        className={`
           block
+          ${fullscreen
+            ? "h-full w-full"
+            : "max-h-full max-w-full"
+          }
+          object-contain
           transition-[width,height]
           duration-300
           ease-out
-        "
+        `}
       />
 
       <button
         onClick={onToggleFullscreen}
         className="
           absolute
-          cursor-pointer
           right-4
           top-4
           z-20
           flex
           h-10
           w-10
+          cursor-pointer
           items-center
           justify-center
           rounded
@@ -91,11 +84,11 @@ export default function Preview({
         "
         title={
           fullscreen
-            ? 'Close fullscreen'
-            : 'Fullscreen'
+            ? "Close fullscreen"
+            : "Fullscreen"
         }
       >
-        {fullscreen ? '×' : '⛶'}
+        {fullscreen ? "×" : "⛶"}
       </button>
     </div>
   )
