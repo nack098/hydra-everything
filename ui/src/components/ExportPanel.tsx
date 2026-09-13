@@ -469,6 +469,7 @@ export default function ExportPanel({
                 }
                 className={`
                   rounded
+                  cursor-pointer
                   px-3
                   py-2
                   font-mono
@@ -493,6 +494,7 @@ export default function ExportPanel({
                 className={`
                   rounded
                   px-3
+                  cursor-pointer
                   py-2
                   font-mono
                   text-xs
@@ -580,6 +582,7 @@ export default function ExportPanel({
                 font-mono
                 text-xs
                 text-ctp-subtext0
+                cursor-pointer
                 transition
                 hover:bg-ctp-surface1
                 hover:text-ctp-text
@@ -762,7 +765,7 @@ export default function ExportPanel({
           onClick={() =>
             void handleExport()
           }
-          className="
+          className={`
             w-full
             rounded
             bg-ctp-blue
@@ -772,11 +775,12 @@ export default function ExportPanel({
             text-xs
             font-semibold
             text-ctp-crust
+            ${exporting ? "cursor-not-allowed" : "cursor-pointer"}
             transition
             hover:brightness-110
             disabled:cursor-not-allowed
             disabled:opacity-50
-          "
+          `}
         >
           {mode === 'single'
             ? 'Export PNG'

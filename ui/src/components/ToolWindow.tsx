@@ -250,6 +250,7 @@ export default function ToolWindow({
           font-mono
           text-sm
           text-ctp-subtext0
+          cursor-pointer
           shadow-lg
           transition-all
           duration-300

@@ -182,6 +182,7 @@ export default function SettingsPanel({
           className="
             flex-1
             rounded
+            cursor-pointer
             bg-ctp-surface0
             px-3
             py-2
@@ -201,6 +202,7 @@ export default function SettingsPanel({
           className="
             flex-1
             rounded
+            cursor-pointer
             bg-ctp-blue
             px-3
             py-2

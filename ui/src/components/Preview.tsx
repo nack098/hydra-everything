@@ -70,6 +70,7 @@ export default function Preview({
         onClick={onToggleFullscreen}
         className="
           absolute
+          cursor-pointer
           right-4
           top-4
           z-20
