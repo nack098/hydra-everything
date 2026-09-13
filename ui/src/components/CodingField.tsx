@@ -47,7 +47,7 @@ export default function CodingField({
         key={`${capture.start}-${capture.end}-${capture.name}`}
         className={
           HIGHLIGHT_CLASSES[capture.name] ??
-          'text-ctp-text'
+          "text-ctp-text"
         }
       >
         {value.slice(
@@ -83,11 +83,7 @@ export default function CodingField({
       return
     }
 
-    pre.scrollTop =
-      textarea.scrollTop
-
-    pre.scrollLeft =
-      textarea.scrollLeft
+    pre.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`
   }
 
   return (
@@ -98,8 +94,10 @@ export default function CodingField({
         className="
           pointer-events-none
           absolute
-          inset-0
-          overflow-hidden
+          left-0
+          top-0
+          min-h-full
+          min-w-full
           whitespace-pre
           p-4
           font-mono
