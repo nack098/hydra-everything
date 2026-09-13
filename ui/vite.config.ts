@@ -18,7 +18,11 @@ export default defineConfig({
     global: {},
   },
   build: {
+    target: "esnext",
+    minify: "oxc",
+    sourcemap: false,
     assetsInlineLimit: Infinity,
+    reportCompressedSize: false,
   },
   resolve: {
     alias: {
